@@ -1,0 +1,35 @@
+#widget {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 200px;
+    height: 200px;
+    border-radius: 10px;
+    background: #f6f3ff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    padding: 10px;
+  }
+  
+  #overlay {
+    width: 60%;
+    height: 60%;
+    margin-bottom: 10px;
+  }
+
+  button {
+    margin: 2px;
+    padding: 5px 10px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: #0056b3;
+  }
