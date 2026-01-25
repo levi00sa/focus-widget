@@ -1,3 +1,73 @@
+import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision';
+// modes: IDLE, FOCUS, BREAK
+
+let faceDetector = null;
+
+// Initialize MediaPipe Face Detector
+async function initFaceDetector() {
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+  );
+
+
+  faceDetector = await FaceDetector.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath:
+        "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite"
+    },
+    runningMode: "VIDEO"
+  });
+
+  console.log("FaceDetector ready");
+}
+
+  let faceVisible = false;
+
+async function detectFace() {
+  if (!faceDetector || !video.videoWidth) return;
+
+  const results = faceDetector.detectForVideo(
+    video,
+    performance.now()
+  );
+
+  faceVisible = results.detections.length > 0;
+
+  if (faceVisible) {
+    positionOverlay(results.detections[0].boundingBox);
+  }
+/*
+  if (results.detections.length > 0) {
+    const face = results.detections[0].boundingBox;
+
+    console.log("Face box:", face);
+
+    positionOverlay(face);
+  }
+    */
+}
+
+initFaceDetector();
+// position the overlay icon above the detected face
+function positionOverlay(face) {
+  const videoRect = video.getBoundingClientRect();
+
+  const scaleX = videoRect.width / video.videoWidth;
+  const scaleY = videoRect.height / video.videoHeight;
+
+  // Center of face
+  const centerX =
+    (face.originX + face.width / 2) * scaleX;
+
+  // Forehead position (move UP by ~30–40% of face height)
+  const foreheadY =
+    (face.originY - face.height * 0.35) * scaleY;
+
+  overlay.style.left = `${centerX}px`;
+  overlay.style.top = `${foreheadY}px`;
+  overlay.style.transform = "translate(-50%, -100%)";
+  overlay.style.display = "block";
+}
 // retrieve saved mode from localStorage or default to IDLE
 let currentMode = localStorage.getItem('currentMode') || 'IDLE';
 
@@ -15,16 +85,30 @@ const toggleButton = document.getElementById('toggle-button'); // button to star
 
 let cameraOn = false;
 
+// handle start/stop camera
+// face detection loop
+let faceLoopRunning = false;
+
+function faceLoop(){
+    if (!cameraOn) {
+      faceLoopRunning = false;
+      return;
+    }
+    faceLoopRunning = true;
+    detectFace();
+    requestAnimationFrame(faceLoop);
+  }
 
 toggleButton.addEventListener('click', async () => {
   if (!cameraOn) {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
     video.srcObject = stream;
+      cameraOn = true;
     video.onloadedmetadata = () => {
       video.play();
       console.log("Camera started");
+      faceLoop();
     };
-    cameraOn = true;
     toggleButton.textContent = "Stop";
   } else {
     video.srcObject?.getTracks().forEach(t => t.stop());
@@ -58,6 +142,7 @@ async function performOCR(imageData) {
 // == detecting mode ==
 
 function applyOverlay(mode) {
+  console.log("Applying overlay for mode:", mode);
   switch(mode) {
     case 'FOCUS':
       overlay.src = 'assets/focus.png';
@@ -68,6 +153,7 @@ function applyOverlay(mode) {
     default:
       overlay.src = 'assets/idle.png';
   }
+  console.log("Overlay src set to:", overlay.src);
 }
 /*
 function toggleMode() {
@@ -173,3 +259,7 @@ setInterval(() => {
       console.log("Auto-detected mode:", mode);
     });
 }, 2000); //every 2 seconds
+
+//TODO: Detect face and get face bounding box or landmarks
+//TODO: Track the face and place the icon overlay to head
+

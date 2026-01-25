@@ -1,5 +1,8 @@
 #widget {
     position: relative;
+    top: 200px;
+    left: 50%;
+    transform: translate(-50%, -50%);
     width: 320px;
     height: 240px;
     border-radius: 10px;
@@ -23,11 +26,11 @@
 
   #overlay {
   position: absolute;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 72px;
+  width: 48px;        
+  height: 48px;
   pointer-events: none;
+  z-index: 10;
+  display: none;
   }
 
   button {
