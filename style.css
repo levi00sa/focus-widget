@@ -1,10 +1,9 @@
 #widget {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 200px;
-    height: 200px;
+    position: relative;
+    width: 320px;
+    height: 240px;
     border-radius: 10px;
+    overflow: hidden;
     background: #f6f3ff;
     display: flex;
     flex-direction: column;
@@ -14,10 +13,21 @@
     padding: 10px;
   }
   
+  #camera-feed {
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+    display: block;
+    border-radius: 10px;
+  }
+
   #overlay {
-    width: 60%;
-    height: 60%;
-    margin-bottom: 10px;
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 72px;
+  pointer-events: none;
   }
 
   button {

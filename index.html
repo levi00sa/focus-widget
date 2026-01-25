@@ -9,17 +9,19 @@
     </head>
     <body>
         <div id="widget">
-            <video id="camera-feed" autoplay muted playsinline style="display:none;"></video>
+            <video id="camera-feed" autoplay muted playsinline"></video>
             <canvas id="canvas" style="display:none;"></canvas>
+            <img id="overlay" src="assets/idle.png" alt="status icon">
             <!-- widget buttons -->
             <button id="toggle-button">Start</button>
             <button id="capture-button">Capture</button>
             <button id="download-button">Download</button>
+            <!--
             <button id="delete-button">Delete</button>
             <button id="save-button">Save</button>
             <button id="share-button">Share</button>
+            -->
             <!-- status icons -->
-            <img id="overlay" src="assets/idle.png" alt="status icon">
         </div>
 
         <!-- OCR script -->
