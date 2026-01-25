@@ -1,6 +1,4 @@
 import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision';
-// modes: IDLE, FOCUS, BREAK
-
 let faceDetector = null;
 
 // Initialize MediaPipe Face Detector
@@ -8,7 +6,6 @@ async function initFaceDetector() {
   const vision = await FilesetResolver.forVisionTasks(
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
   );
-
 
   faceDetector = await FaceDetector.createFromOptions(vision, {
     baseOptions: {
@@ -21,45 +18,28 @@ async function initFaceDetector() {
   console.log("FaceDetector ready");
 }
 
-  let faceVisible = false;
-
+let faceVisible = false;
 async function detectFace() {
   if (!faceDetector || !video.videoWidth) return;
-
   const results = faceDetector.detectForVideo(
     video,
     performance.now()
   );
-
   faceVisible = results.detections.length > 0;
-
   if (faceVisible) {
     positionOverlay(results.detections[0].boundingBox);
   }
-/*
-  if (results.detections.length > 0) {
-    const face = results.detections[0].boundingBox;
-
-    console.log("Face box:", face);
-
-    positionOverlay(face);
-  }
-    */
 }
 
 initFaceDetector();
 // position the overlay icon above the detected face
 function positionOverlay(face) {
   const videoRect = video.getBoundingClientRect();
-
   const scaleX = videoRect.width / video.videoWidth;
   const scaleY = videoRect.height / video.videoHeight;
 
-  // Center of face
   const centerX =
     (face.originX + face.width / 2) * scaleX;
-
-  // Forehead position (move UP by ~30–40% of face height)
   const foreheadY =
     (face.originY - face.height * 0.35) * scaleY;
 
@@ -125,20 +105,6 @@ function captureFrame(){
   console.log("Auto-detected mode:", currentMode);
   return canvas.toDataURL('image/png');
 }
-/*
-async function performOCR(imageData) {
-  if (!cameraOn) return;
-  captureFrame();
-  const { data: {text}} = await Tesseract.recognize(canvas, 'eng');
-  console.log("OCR Result:", text);
-  const detectedMode = detectModeFromText(text);
-  if (detectedMode !== 'IDLE') {
-    currentMode = detectedMode;
-    saveMode(currentMode);
-    applyOverlay(currentMode);
-  }
-}
-*/
 // == detecting mode ==
 
 function applyOverlay(mode) {
@@ -155,33 +121,7 @@ function applyOverlay(mode) {
   }
   console.log("Overlay src set to:", overlay.src);
 }
-/*
-function toggleMode() {
-  if (currentMode === 'IDLE') {
-    currentMode = 'FOCUS';
-  } else if (currentMode === 'FOCUS') {
-    currentMode = 'BREAK';
-  } else {
-    currentMode = 'IDLE';
-  }
-  saveMode(currentMode);
-  applyOverlay(currentMode);
-  
-  // Manage camera based on mode
-  if (currentMode === 'FOCUS' || currentMode === 'BREAK') {
-    if (!video.srcObject) {
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => { video.srcObject = stream; })
-        .catch(err => console.error("Camera access denied:", err));
-    }
-  } else {
-    if (video.srcObject) {
-      video.srcObject.getTracks().forEach(track => track.stop());
-      video.srcObject = null;
-    }
-  }
-}
-*/
+
 function downloadImage() {
   const imageData = captureFrame();
   const a = document.createElement('a');
@@ -189,30 +129,9 @@ function downloadImage() {
   a.download = 'capture.png';
   a.click();
 }
-/*
-function deleteImage() {
-  const canvas = document.getElementById('canvas');
-  canvas.width = 0;
-  canvas.height = 0;
-}
 
-function saveImage() {
-  const imageData = captureImage();
-  localStorage.setItem('lastImage', imageData);
-}
-
-function shareImage() {
-  const imageData = captureImage();
-  const a = document.createElement('a');
-  a.href = imageData;
-  a.download = 'capture.png';
-  a.click();
-}
-*/
-// Initialize overlay on load
 applyOverlay(currentMode);
 
-// Add event listeners
 document.getElementById('capture-button').addEventListener('click', () => {
   const imageData = captureFrame();
   // Run OCR on the captured image
@@ -228,19 +147,38 @@ document.getElementById('capture-button').addEventListener('click', () => {
 });
 
 function detectModeFromText(text) {
-  const focusKeywords = ['work', 'study', 'focus'];
-  const breakKeywords = ['rest', 'break', 'pause'];
+  const focusKeywords = ['focus', 'study', 'work'];
+  const breakKeywords = ['break', 'rest', 'pause'];
 
-  const lowerText = text.toLowerCase();
-  if (focusKeywords.some(keyword => lowerText.includes(keyword))) {
+  const lowerText = String(text ?? '').toLowerCase().trim();
+
+  if (lowerText === '') {
+    return 'IDLE';
+  }
+  if (focusKeywords.some(k => lowerText.includes(k))) {
     return 'FOCUS';
-  } else if (breakKeywords.some(keyword => lowerText.includes(keyword))) {
+  }
+  if (breakKeywords.some(k => lowerText.includes(k))) {
     return 'BREAK';
   }
-  return 'IDLE';
+  return null;
+}
+
+function updateMode(newMode){
+  if (!newMode) return;;
+
+  if (newMode !== currentMode) {
+    currentMode = newMode;
+    saveMode(currentMode);
+    applyOverlay(currentMode);
+    console.log("Auto-update mode: ", currentMode);
+  }
 }
 
 // ===== Automatic OCR loop =====
+let lastDetectedMode = 'IDLE';
+let modeConfirmationCount = 0;
+
 setInterval(() => {
   // Only run if camera is ON
   if (!video.srcObject) return;
@@ -250,15 +188,20 @@ setInterval(() => {
   Tesseract.recognize(canvas, 'eng')
     .then(result => {
       console.log("Recognized text:", result.data.text);
-      const mode = detectModeFromText(result.data.text);
-
-      currentMode = mode;
-      saveMode(mode);
-      applyOverlay(mode);
-
-      console.log("Auto-detected mode:", mode);
+      const detectedMode = detectModeFromText(result.data.text);
+      
+      if (detectedMode === lastDetectedMode) {
+        modeConfirmationCount++;
+        if (modeConfirmationCount >= 3) { //require 3 consecutive detections to update instead of changing immediately
+          updateMode(detectedMode);
+          modeConfirmationCount = 0; //reset after update
+        }
+      } else {
+        lastDetectedMode = detectedMode;
+        modeConfirmationCount = 1; // Start counting
+      }
     });
-}, 2000); //every 2 seconds
+}, 20000); //every 20 seconds
 
 //TODO: Detect face and get face bounding box or landmarks
 //TODO: Track the face and place the icon overlay to head
