@@ -59,7 +59,7 @@ A web-based focus tracking widget that uses your camera to detect your current a
 
 ## How It Works
 
-- **OCR Detection**: Every 2 seconds, the app captures a frame from the camera, runs OCR using Tesseract.js, and checks for keywords to determine the mode.
+- **OCR Detection**: Every 20 seconds, the app captures a frame from the camera, runs OCR using Tesseract.js, and checks for keywords to determine the mode.
 - **Confirmation**: To avoid flickering, the mode only updates after the same mode is detected in 3 consecutive scans.
 - **Face Positioning**: MediaPipe detects faces in the video feed and positions the overlay icon dynamically.
 - **Fallback**: If no face is detected, the icon stays at a default position (top center).
