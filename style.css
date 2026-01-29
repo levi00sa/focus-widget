@@ -1,13 +1,24 @@
 #widget {
   position: relative;
-  top: 200px;
+  top: 400px;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 320px;
-  border-radius: 10px;
-  background: #f6f3ff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  width: 360px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f8f6ff, #f1edff);
+  box-shadow:
+      0 10px 25px rgba(0,0,0,0.12),
+      inset 0 1px 0 rgba(255,255,255,0.6);
   padding: 10px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+#widget[data-mode="FOCUS"] {
+  box-shadow: 0 0 0 2px rgba(120,90,255,0.4);
+}
+
+#widget[data-mode="BREAK"] {
+  box-shadow: 0 0 0 2px rgba(255,193,7,0.4);
 }
 
 #video-layer {
@@ -21,33 +32,93 @@
 #camera-feed {
   width: 100%;
   height: 100%;
+  aspect-ratio: 4 / 3; 
+  border-radius: 12px;
   object-fit: cover;
+}
+
+#timer-display {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 6px;
+  font-size: 12px;
+  color: #5a5a7a;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+#timer-display span {
+  font-weight: 600;
+  color: #2d2d44;
 }
 
 #overlay {
   position: absolute;
-  width: 64px;        
-  height: 64px;
-  pointer-events: none;
+  width: 56px;
+  height: 56px;
   z-index: 10;
+  pointer-events: none;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
 }
 
 #ocr-guide {
-  position: absolute; 
-  border: 2px dashed #007bff;
+  position: absolute;
+  border: 2px dashed rgba(120, 90, 255, 0.6);
+  background-origin: 12px;
   pointer-events: none;
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    opacity 0.3s ease;
+}
+
+#ocr-guide.readable {
+  border-color: #5fce90;
+  box-shadow: 0 0 12px rgba(95, 206, 144, 0.5);
+}
+
+#ocr-guide.no-text {
+  border-color: #ff6b6b;
+  opacity: 0.7;
+}
+
+#ocr-guide.scanning {
+  animation: pulse 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 rgba(120,90,255,0.3);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(120,90,255,0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(120,90,255,0.3);
+  }
 }
 
 button {
-  margin: 2px;
-  padding: 5px 10px;
-  background: #007bff;
+  margin: 6px 4px;
+  padding: 6px 12px;
+  background: #6b5cff;
   color: white;
   border: none;
-  border-radius: 5px;
+  border-radius: 8px;
+  font-size: 12px;
   cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.1s ease;
 }
 
 button:hover {
-  background: #0056b3;
+  background: #5848e5;
+}
+
+button:active {
+  transform: scale(0.96);
 }

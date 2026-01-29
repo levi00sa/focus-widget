@@ -1,31 +1,52 @@
 import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision';
+
 let faceDetector = null; // stats as null until WASM + model loads
 
 // Initialize Tesseract worker once for reuse
 let tesseractWorker = null;
+let initError = null;
+
+let lastInteractionTime = Date.now();
+const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
+['mousemove', 'keydown', 'click', 'scroll'].forEach(evt =>
+  window.addEventListener(evt, () => {
+    lastInteractionTime = Date.now();
+  })
+);
 
 async function initTesseractWorker() {
-  tesseractWorker = await Tesseract.createWorker();
-  await tesseractWorker.loadLanguage('eng');
-  await tesseractWorker.initialize('eng');
-  console.log("Tesseract worker ready");
+  try {
+    tesseractWorker = await Tesseract.createWorker();
+    await tesseractWorker.loadLanguage('eng');
+    await tesseractWorker.initialize('eng');
+    console.log("Tesseract worker ready");
+  } catch (error) {
+    console.error("Error initializing Tesseract:", error);
+    initError = "OCR initialization failed";
+  }
 }
 
 async function initFaceDetector() {
-  //load the MediaPipe Vision WASM files
-  const vision = await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-  );
+  try {
+    //load the MediaPipe Vision WASM files
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+    );
 
-  faceDetector = await FaceDetector.createFromOptions(vision, {
-    baseOptions: { // load blaze face short range model
-      modelAssetPath: 
-        "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite"
-    },
-    runningMode: "VIDEO" //process video frames
-  });
+    faceDetector = await FaceDetector.createFromOptions(vision, {
+      baseOptions: { // load blaze face short range model
+        modelAssetPath: 
+          "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite"
+      },
+      runningMode: "VIDEO" //process video frames
+    });
 
-  console.log("FaceDetector ready");
+    console.log("FaceDetector ready");
+  } catch (error) {
+    console.error("Error initializing FaceDetector:", error);
+    initError = "Face detection initialization failed";
+  }
 }
 
 initFaceDetector();
@@ -33,14 +54,18 @@ initTesseractWorker();
 let faceVisible = false; // track whether a face is already detected
 async function detectFace() {
   if (!faceDetector || !video.videoWidth) return;
-  const results = faceDetector.detectForVideo(
-    video,
-    performance.now()
-  );
-  faceVisible = results.detections.length > 0; // check if any face is detected
-  overlay.style.display = faceVisible ? "block" : "none"; // hide overlay if no face
-  if (faceVisible) {
-    positionOverlay(results.detections[0].boundingBox); // position overlay on first detected face
+  try {
+    const results = faceDetector.detectForVideo(
+      video,
+      performance.now()
+    );
+    faceVisible = results.detections.length > 0; // check if any face is detected
+    overlay.style.display = faceVisible ? "block" : "none"; // hide overlay if no face
+    if (faceVisible) {
+      positionOverlay(results.detections[0].boundingBox); // position overlay on first detected face
+    }
+  } catch (error) {
+    console.error("Error detecting face:", error);
   }
 }
 
@@ -84,6 +109,11 @@ const height = Math.min(videoHeight * 0.3, 120);
 // retrieve saved mode from localStorage or default to IDLE
 let currentMode = localStorage.getItem('currentMode') || 'IDLE';
 
+// Initialize time tracking object
+const timeStats = {
+  FOCUS: 0, IDLE: 0, BREAK: 0, lastTimestamp: Date.now()
+};
+
 // save current mode to localStorage to persist across sessions
 function saveMode(mode) {
   localStorage.setItem('currentMode', mode);
@@ -115,16 +145,21 @@ function faceLoop(){
 
 toggleButton.addEventListener('click', async () => {
   if (!cameraOn) {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    video.srcObject = stream;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
       cameraOn = true;
-    video.onloadedmetadata = () => {
-      video.play();
-      console.log("Camera started");
-      positionOCRGuide(); // position guide when video is ready
-      faceLoop();
-    };
-    toggleButton.textContent = "Stop";
+      video.onloadedmetadata = () => {
+        video.play();
+        console.log("Camera started");
+        positionOCRGuide(); // position guide when video is ready
+        faceLoop();
+      };
+      toggleButton.textContent = "Stop";
+    } catch (error) {
+      console.error("Error accessing camera:", error);
+      alert("Unable to access camera. Please check permissions.");
+    }
   } else {
     video.srcObject?.getTracks().forEach(t => t.stop());
     video.srcObject = null;
@@ -186,6 +221,7 @@ function captureFrame() {
 // == detecting mode ==
 
 function applyOverlay(mode) {
+  document.getElementById('widget').dataset.mode = mode;
   console.log("Applying overlay for mode:", mode);
   switch(mode) {
     case 'FOCUS':
@@ -201,29 +237,43 @@ function applyOverlay(mode) {
 }
 
 function downloadImage() {
-  const imageData = captureFrame();
-  const a = document.createElement('a');
-  a.href = imageData;
-  a.download = 'capture.png';
-  a.click();
+  try {
+    const canvasElement = captureFrame();
+    const a = document.createElement('a');
+    a.href = canvasElement.toDataURL('image/png');
+    a.download = `focus-widget-${Date.now()}.png`;
+    a.click();
+    console.log("Image downloaded");
+  } catch (error) {
+    console.error("Error downloading image:", error);
+    alert("Failed to download image");
+  }
 }
 
 document.getElementById('download-button').addEventListener('click', downloadImage);
 
 applyOverlay(currentMode);
 
-document.getElementById('capture-button').addEventListener('click', () => {
-  const imageData = captureFrame();
-  // Run OCR on the captured image using reused worker
-  tesseractWorker.recognize(canvas)
-    .then(({ data: { text } }) => {
-      const detectedMode = detectModeFromText(text);
-      if (detectedMode !== 'IDLE') {
-        currentMode = detectedMode;
-        saveMode(currentMode);
-        applyOverlay(currentMode);
-      }
-    });
+document.getElementById('scan-button').addEventListener('click', async () => {
+  if (!tesseractWorker) {
+    alert("OCR not ready. Please wait for initialization.");
+    return;
+  }
+  try {
+    captureFrame();
+    // Run OCR on the captured image using reused worker
+    const { data: { text } } = await tesseractWorker.recognize(canvas);
+    const detectedMode = detectModeFromText(text);
+    if (detectedMode !== 'IDLE' && detectedMode !== null) {
+      currentMode = detectedMode;
+      saveMode(currentMode);
+      applyOverlay(currentMode);
+      console.log("Mode updated from capture:", currentMode);
+    }
+  } catch (error) {
+    console.error("Error during manual OCR:", error);
+    alert("OCR processing failed");
+  }
 });
 
 function detectModeFromText(text) {
@@ -244,37 +294,106 @@ function detectModeFromText(text) {
   return null;
 }
 
-function updateMode(newMode){
-  if (!newMode) return;
-
-  if (newMode !== currentMode) {
-    currentMode = newMode;
-    saveMode(currentMode);
-    applyOverlay(currentMode);
-    console.log("Auto-update mode: ", currentMode);
+function formatTime(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
   }
+  return `${minutes}m ${seconds}s`;
+}
+
+function updateMode(newMode){
+  if (!newMode || newMode === currentMode) return;
+  const now = Date.now();
+  const timeElapsed = now - timeStats.lastTimestamp;
+  timeStats[currentMode] += timeElapsed;
+  timeStats.lastTimestamp = now;
+
+  currentMode = newMode;
+  saveMode(currentMode);
+  applyOverlay(currentMode);
+  localStorage.setItem('timeStats', JSON.stringify(timeStats));
+  console.log("Auto-update mode: ", currentMode);
 }
 
 // ===== Automatic OCR loop =====
 let lastDetectedMode = 'IDLE';
 let modeConfirmationCount = 0;
 
-setInterval(async () => {
-  if (!video.srcObject || !tesseractWorker || !faceVisible) return;
-
-  captureFrame();
-
-  const { data: { text } } = await tesseractWorker.recognize(canvas);
-  const detectedMode = detectModeFromText(text);
-
-  if (detectedMode === lastDetectedMode) {
-    modeConfirmationCount++;
-    if (modeConfirmationCount >= 3) {
-      updateMode(detectedMode);
-      modeConfirmationCount = 0;
-    }
+function updateOCRGuideStatus(hasText) {
+  ocrGuide.classList.remove('readable', 'no-text', 'scanning');
+  if (hasText) {
+    ocrGuide.classList.add('readable');
   } else {
-    lastDetectedMode = detectedMode;
-    modeConfirmationCount = 1;
+    ocrGuide.classList.add('no-text');
+  }
+}
+
+setInterval(async () => {
+  if (!video.srcObject || !tesseractWorker) return; //camera on and no face means auto IDLE
+
+  if (!faceVisible) {
+    updateMode('IDLE');
+    return;
+  }
+
+  if (Date.now() - lastInteractionTime > IDLE_TIMEOUT) {
+    updateMode('IDLE');
+    return;
+  }
+
+  try {
+    // Show pulse while OCR is running
+    ocrGuide.classList.add('scanning');
+
+    captureFrame();
+
+    const { data: { text } } = await tesseractWorker.recognize(canvas);
+    
+    // Update guide status based on whether text was detected
+    updateOCRGuideStatus(text && text.trim().length > 0);
+
+    const detectedMode = detectModeFromText(text);
+
+    if (detectedMode === lastDetectedMode) {
+      modeConfirmationCount++;
+      if (modeConfirmationCount >= 3) {
+        updateMode(detectedMode);
+        modeConfirmationCount = 0;
+      }
+    } else {
+      lastDetectedMode = detectedMode;
+      modeConfirmationCount = 1;
+    }
+  } catch (error) {
+    console.error("Error in auto OCR loop:", error);
+  } finally {
+    // Remove pulse animation after OCR completes
+    ocrGuide.classList.remove('scanning');
   }
 }, 20000);
+
+// ===== Live time display =====
+setInterval(() => {
+  try {
+    const now = Date.now();
+    const tempElapsed = now - timeStats.lastTimestamp;
+
+    const tempStats = { ...timeStats };
+    tempStats[currentMode] += tempElapsed;
+
+    const focusElement = document.getElementById('focus-time');
+    const breakElement = document.getElementById('break-time');
+    const idleElement = document.getElementById('idle-time');
+
+    if (focusElement) focusElement.textContent = formatTime(tempStats.FOCUS);
+    if (breakElement) breakElement.textContent = formatTime(tempStats.BREAK);
+    if (idleElement) idleElement.textContent = formatTime(tempStats.IDLE);
+  } catch (error) {
+    console.error("Error updating timer display:", error);
+  }
+}, 1000);
