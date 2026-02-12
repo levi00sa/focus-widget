@@ -113,7 +113,20 @@ let currentMode = localStorage.getItem('currentMode') || 'IDLE';
 const timeStats = {
   FOCUS: 0, IDLE: 0, BREAK: 0, lastTimestamp: Date.now()
 };
-
+// restore timeStats from localStorage if available
+try {
+  const savedStats = localStorage.getItem('timeStats');
+  if (savedStats) {
+    const parsed = JSON.parse(savedStats);
+    timeStats.FOCUS = Number(parsed.FOCUS) || 0;
+    timeStats.BREAK = Number(parsed.BREAK) || 0;
+    timeStats.IDLE = Number(parsed.IDLE) || 0;
+    timeStats.lastTimestamp = Date.now();
+    console.log('Restored timeStats from localStorage:', timeStats);
+  }
+} catch (err) {
+  console.error('Failed to restore timeStats:', err);
+}
 // save current mode to localStorage to persist across sessions
 function saveMode(mode) {
   localStorage.setItem('currentMode', mode);
